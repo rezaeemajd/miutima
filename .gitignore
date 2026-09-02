@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# miutima generated downloads
+mp4ytd/*
+mp3ytd/*
+*.part
+*.ytdl
+*.temp
+
+# Local logs / environment
+*.log
+.env
+.env.*
+!.env.example
