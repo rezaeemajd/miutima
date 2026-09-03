@@ -1,101 +1,114 @@
 # miutima
 
-**miutima v1.1.0** is a smart, interactive command-line media downloader for **Termux and Linux**. It provides a Rich-based terminal interface for downloading YouTube videos as MP4 or audio as MP3, with clipboard mode, video inspection, search, history, settings, retry/resume support, and FFmpeg integration.
+**miutima v1.1.0** is a smart, interactive YouTube media downloader for **Windows CMD, Linux terminal and Android Termux**.
 
 > **Developer:** Amir Majd  
-> **Version:** v1.1.0  
-> **Project:** miutima
+> **Website:** cofinets.com  
+> **License:** MIT
 
 ## ✨ Features
 
-- 🎬 Download YouTube videos as **MP4**
-- 🎵 Download YouTube audio as **MP3** at selectable 128/192/256/320 kbps
-- 📋 **Clipboard mode** on Termux when `termux-clipboard-get` is available
-- 🔎 **YouTube search** directly from the terminal
-- 🔍 **Video Inspector** before downloading: title, channel, duration, views, upload date
-- 📚 **Download history** with re-download support
-- ⚙️ Persistent **settings** stored in `~/.config/miutima/config.json`
-- 📝 Optional subtitle downloading
-- 🖼️ Optional thumbnail embedding
-- 🏷️ Optional metadata embedding
-- 📊 Interactive terminal UI powered by Rich
-- 📦 Download-size estimation when metadata provides size information
-- 🔁 Network, fragment, and file-access retries
+- 🎬 YouTube video download as MP4
+- 🎵 Audio download as MP3
+- 📋 **Cross-platform Clipboard**
+- 🔍 Video Inspector before download
+- 🔎 YouTube search
+- 📚 Download history and re-download
+- ⚙️ Persistent settings
+- 🎚️ Video quality: 2160p, 1440p, 1080p, 720p, 480p, 360p
+- 🎚️ MP3 bitrate: 128, 192, 256, 320 kbps
+- 📝 Optional subtitles
+- 🖼️ Optional thumbnail
+- 🏷️ Optional metadata
+- 🔁 Network, fragment and file-access retries
 - ▶️ Continued/resumable downloads
-- 🚫 Avoids overwriting existing downloads
-- ⚙️ FFmpeg support for media conversion and MP4 merging
-- 📱 Designed to work well on Android/Termux
-- 🐧 Works on Linux systems with Python 3
-- 🔗 Accepts standard `youtube.com` and `youtu.be` URLs
+- 🚫 Does not intentionally overwrite completed downloads
+- ⚙️ FFmpeg integration
+- 📱 Android/Termux friendly
+- 🪟 Windows CMD friendly
+- 🐧 Linux terminal friendly
 
-## 📁 Project Structure
+## 📋 Clipboard support
 
-```text
-miutima/
-├── miutima.py
-├── requirements.txt
-├── README.md
-├── LICENSE
-├── .gitignore
-└── docs/
-    └── usage.md
-```
+miutima uses native clipboard commands and does not require a Python clipboard package.
 
-Downloaded files are stored outside version control in `mp4ytd/` and `mp3ytd/`.
+| Platform | Clipboard method | Extra setup |
+|---|---|---|
+| Windows | PowerShell `Get-Clipboard` | PowerShell available in Windows |
+| Linux Wayland | `wl-paste` | `wl-clipboard` package |
+| Linux X11 | `xclip` / `xsel` | install either package |
+| Termux | `termux-clipboard-get` | Termux:API package/app |
 
-Local application data:
+### Windows
 
-```text
-~/.config/miutima/
-├── config.json
-└── history.json
-```
+Copy a YouTube URL with `Ctrl+C`, start miutima and choose **2 - Clipboard**.
 
-## 🛠️ Requirements
+### Linux
 
-- Python **3.10+** recommended
-- `yt-dlp`
-- `rich`
-- `imageio-ffmpeg`
-- FFmpeg
-- Internet access
-- Optional on Termux: `termux-api` for clipboard integration
-
-## 🚀 Installation
+Copy a URL and choose **2 - Clipboard**. On Wayland install `wl-clipboard`; on X11 install `xclip` or `xsel`.
 
 ### Termux
 
-```bash
-pkg update
-pkg install python ffmpeg git -y
-git clone https://github.com/rezaeemajd/miutima.git
-cd miutima
-pip install -r requirements.txt
-```
-
-For clipboard support:
+Install both the Termux package and the companion Android application:
 
 ```bash
 pkg install termux-api -y
 ```
 
-### Linux
+Then copy a YouTube URL in Android and choose **2 - Clipboard** in miutima.
 
-```bash
-sudo apt update
-sudo apt install python3 python3-pip ffmpeg git -y
+See [`docs/platforms.md`](docs/platforms.md) for complete platform instructions.
+
+## 🚀 Installation
+
+### Windows CMD
+
+```bat
 git clone https://github.com/rezaeemajd/miutima.git
 cd miutima
-python3 -m pip install -r requirements.txt
-```
-
-## ▶️ Run
-
-```bash
+python -m pip install -r requirements.txt
 python miutima.py
 ```
 
-The v1.1 main menu is:
+A CMD launcher is also available:
+
+```text
+windows/run_miutima.bat
+```
+
+### Linux
+
+```bash
+git clone https://github.com/rezaeemajd/miutima.git
+cd miutima
+python3 -m pip install -r requirements.txt
+python3 miutima.py
+```
+
+Launcher:
+
+```bash
+bash linux/run_miutima.sh
+```
+
+### Android Termux
+
+```bash
+pkg update
+pkg install python git ffmpeg termux-api -y
+git clone https://github.com/rezaeemajd/miutima.git
+cd miutima
+python -m pip install -r requirements.txt
+python miutima.py
+```
+
+Launcher:
+
+```bash
+bash termux/run_miutima.sh
+```
+
+## ▶️ Main menu
 
 ```text
 1 - 🔗 Download URL
@@ -106,112 +119,113 @@ The v1.1 main menu is:
 6 - ❌ Exit
 ```
 
-## 📋 Clipboard Mode
+## 🎬 Video
 
-Copy a YouTube URL on Android and select **Clipboard** in miutima. If `termux-clipboard-get` is available, miutima reads the copied URL and continues to the normal inspector/download flow.
+Select a quality limit and miutima chooses the best available video/audio combination up to that resolution, then uses FFmpeg to merge streams into MP4 when necessary.
 
-## 🔍 Video Inspector
+## 🎵 Audio
 
-Before a download, miutima can show the title, channel/uploader, duration, view count, and upload date so the user can confirm the correct video.
+Select 128, 192, 256 or 320 kbps. FFmpeg converts the selected audio stream to MP3.
 
-## 🔎 YouTube Search
+## 🔍 Inspector
 
-Search directly from the terminal. miutima displays up to eight results and lets the user select one for the normal download flow.
+Before downloading, miutima can display title, channel, duration, view count and upload date so you can verify the selected media.
 
-## 📚 Download History
+## 🔎 Search
 
-The latest 100 download records are stored locally in `~/.config/miutima/history.json`. A selected item can be downloaded again.
+Use **Search YouTube** to search directly from the terminal. Select a result and continue through the normal download flow.
+
+## 📚 History
+
+The last 100 downloads are stored locally. The history menu shows recent items and can start a download again without manually copying the URL.
 
 ## ⚙️ Settings
 
-Available settings include:
+Settings are stored outside the repository:
 
-- default video quality
-- default audio bitrate
-- metadata embedding
-- thumbnail embedding
-- subtitle downloading
-- subtitle language
+```text
+~/.config/miutima/config.json
+```
 
-## 🎬 MP4 Downloads
+History is stored at:
 
-Supported target heights:
+```text
+~/.config/miutima/history.json
+```
 
-- 2160p (4K)
-- 1440p
-- 1080p
-- 720p
-- 480p
-- 360p
+Available settings include default video quality, audio bitrate, metadata, thumbnail and subtitle options.
 
-FFmpeg merges compatible video/audio streams into MP4.
+## 📁 Output
 
-## 🎵 MP3 Downloads
+```text
+miutima/
+├── mp4ytd/     # MP4 downloads
+└── mp3ytd/     # MP3 downloads
+```
 
-Audio mode selects the best available audio stream and converts it to MP3 at the selected bitrate: **128, 192, 256, or 320 kbps**.
-
-## 📝 Subtitles and Metadata
-
-When enabled in Settings, miutima can request subtitles and embed available metadata/thumbnail information. Availability depends on the source and formats exposed by yt-dlp.
+Generated media and partial download files are excluded by `.gitignore`.
 
 ## 🔁 Reliability
 
-miutima enables socket, network, fragment, and file-access retries, continued downloads, and avoids intentionally overwriting completed files. Partial downloads can usually be resumed by yt-dlp.
+miutima enables socket, network, fragment and file-access retries plus continued downloads. If a connection is interrupted, running the same download again can allow yt-dlp to resume a partial file where supported.
 
-## 🧪 Troubleshooting
+## 🛠️ Requirements
 
-### `ModuleNotFoundError`
+- Python 3.10+
+- Git
+- FFmpeg
+- Internet access
+- `yt-dlp`
+- `rich`
+- `imageio-ffmpeg`
+
+Install Python dependencies with:
 
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
-### Clipboard unavailable on Termux
+On Linux where `python` is not Python 3, use `python3`.
+
+## 🔄 Update
 
 ```bash
-pkg install termux-api -y
+git pull
+python -m pip install -r requirements.txt --upgrade
 ```
 
-The matching Termux:API Android companion app may also be required. Normal URL mode works without clipboard integration.
-
-### FFmpeg missing
+## 🧪 Verify
 
 ```bash
+python --version
+yt-dlp --version
 ffmpeg -version
+python -m py_compile miutima.py
 ```
 
-Termux:
+## 📦 Versions
 
-```bash
-pkg install ffmpeg -y
-```
+Stable version snapshots are preserved as branches:
 
-Debian/Ubuntu:
+- `v1.0.0` — original stable downloader
+- `v1.1.0` — Smart Downloader
+- `main` — latest development state
 
-```bash
-sudo apt install ffmpeg -y
-```
+See [`CHANGELOG.md`](CHANGELOG.md) for the complete version history.
 
-### Download stops or times out
+## ⚖️ Responsible use
 
-Check connectivity and retry. miutima already enables multiple retry mechanisms and continued downloads.
-
-## ⚖️ Legal & Responsible Use
-
-miutima is a downloader interface built on top of yt-dlp. Users are responsible for complying with YouTube's Terms of Service, copyright law, and the rights of content owners in their jurisdiction. Download only content that you are legally permitted to download.
+miutima is a local interface built on top of yt-dlp. Users are responsible for complying with applicable laws, copyright, service terms and the rights of content owners. Download only media you are legally permitted to download.
 
 ## 🔐 Privacy
 
-miutima is local software. It does not require a miutima account and does not include a project-owned analytics or tracking service. Network requests are made by the underlying downloader/search components.
-
-## 📌 Version
-
-**miutima v1.1.0 — Smart Downloader**
-
-## 👨‍💻 Developer
-
-**Amir Majd**
+miutima does not require a miutima account and does not include project-owned analytics or tracking. Network requests required for extraction and downloading are made by the underlying downloader components.
 
 ## 📄 License
 
-Released under the **MIT License**. See [`LICENSE`](LICENSE).
+MIT License. See [`LICENSE`](LICENSE).
+
+## 👨‍💻 Developer
+
+**Amir Majd**  
+Website: **cofinets.com**
