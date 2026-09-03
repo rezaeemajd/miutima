@@ -1,231 +1,465 @@
-# miutima
+# miutima v1.1.0
 
-**miutima v1.1.0** is a smart, interactive YouTube media downloader for **Windows CMD, Linux terminal and Android Termux**.
+**miutima** is a smart interactive YouTube media downloader for **Windows CMD, Linux/Ubuntu/WSL and Android Termux**.
 
-> **Developer:** Amir Majd  
-> **Website:** cofinets.com  
-> **License:** MIT
+- **Developer:** Amir Majd
+- **Website:** https://cofinets.com
+- **License:** MIT
 
-## ✨ Features
+## v1.1.0 features
 
-- 🎬 YouTube video download as MP4
-- 🎵 Audio download as MP3
-- 📋 **Cross-platform Clipboard**
-- 🔍 Video Inspector before download
-- 🔎 YouTube search
-- 📚 Download history and re-download
-- ⚙️ Persistent settings
-- 🎚️ Video quality: 2160p, 1440p, 1080p, 720p, 480p, 360p
-- 🎚️ MP3 bitrate: 128, 192, 256, 320 kbps
-- 📝 Optional subtitles
-- 🖼️ Optional thumbnail
-- 🏷️ Optional metadata
-- 🔁 Network, fragment and file-access retries
-- ▶️ Continued/resumable downloads
-- 🚫 Does not intentionally overwrite completed downloads
-- ⚙️ FFmpeg integration
-- 📱 Android/Termux friendly
-- 🪟 Windows CMD friendly
-- 🐧 Linux terminal friendly
+- MP4 video download
+- MP3 audio extraction
+- Video Inspector
+- YouTube search with network fallback
+- Clipboard support on Windows, WSL, Linux Wayland/X11 and Termux
+- Download history and re-download
+- Persistent settings
+- Video quality: 2160p, 1440p, 1080p, 720p, 480p, 360p
+- MP3 bitrate: 128, 192, 256, 320 kbps
+- Optional subtitles
+- Optional thumbnail
+- Optional metadata
+- Retry and fragment retry
+- Continued/resumable downloads
+- FFmpeg integration
+- No intentional overwrite of completed downloads
 
-## 📋 Clipboard support
+## Important: Python version
 
-miutima uses native clipboard commands and does not require a Python clipboard package.
+Use **Python 3.11 or newer**.
 
-| Platform | Clipboard method | Extra setup |
-|---|---|---|
-| Windows | PowerShell `Get-Clipboard` | PowerShell available in Windows |
-| Linux Wayland | `wl-paste` | `wl-clipboard` package |
-| Linux X11 | `xclip` / `xsel` | install either package |
-| Termux | `termux-clipboard-get` | Termux:API package/app |
+Current yt-dlp releases are moving away from Python 3.10; Python 3.10 can display a deprecation warning. Using Python 3.11+ avoids that warning and is the recommended environment for this release.
 
-### Windows
+Check your version:
 
-Copy a YouTube URL with `Ctrl+C`, start miutima and choose **2 - Clipboard**.
+```bash
+python --version
+```
 
-### Linux
+or on Linux:
 
-Copy a URL and choose **2 - Clipboard**. On Wayland install `wl-clipboard`; on X11 install `xclip` or `xsel`.
+```bash
+python3 --version
+```
 
-### Termux
+## Requirements
 
-Install both the Termux package and the companion Android application:
+### All platforms
+
+- Python 3.11+
+- Git
+- Internet access
+- Python packages from `requirements.txt`
+- FFmpeg recommended for MP4 merging and MP3 conversion
+
+### Python packages
+
+```text
+yt-dlp
+rich
+imageio-ffmpeg
+```
+
+Install them with:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+## Windows CMD — complete installation
+
+1. Install Python 3.11+ and Git.
+2. Open **Command Prompt (CMD)**.
+3. Clone the v1.1.0 branch:
+
+```cmd
+git clone -b v1.1.0 https://github.com/rezaeemajd/miutima.git
+cd miutima
+```
+
+4. Create and activate a virtual environment (recommended):
+
+```cmd
+py -3 -m venv .venv
+.venv\Scripts\activate.bat
+```
+
+5. Install dependencies:
+
+```cmd
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+6. Start:
+
+```cmd
+python miutima.py
+```
+
+### Windows clipboard
+
+Copy a YouTube URL with `Ctrl+C`, then choose **2 - Clipboard**.
+
+miutima reads the Windows clipboard through PowerShell `Get-Clipboard`; no Python clipboard package is required.
+
+If PowerShell is unavailable, verify:
+
+```cmd
+where powershell
+powershell -NoProfile -Command "Get-Clipboard -Raw"
+```
+
+## Ubuntu / Debian Linux — complete installation
+
+Install system packages:
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-pip python3-venv git ffmpeg
+```
+
+Clone v1.1.0:
+
+```bash
+git clone -b v1.1.0 https://github.com/rezaeemajd/miutima.git
+cd miutima
+```
+
+Create a virtual environment:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+Install dependencies:
+
+```bash
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+Run:
+
+```bash
+python miutima.py
+```
+
+### Linux clipboard — Wayland
+
+Install:
+
+```bash
+sudo apt install -y wl-clipboard
+```
+
+Test:
+
+```bash
+wl-paste --no-newline
+```
+
+### Linux clipboard — X11
+
+Install either `xclip` or `xsel`:
+
+```bash
+sudo apt install -y xclip
+```
+
+Test:
+
+```bash
+xclip -selection clipboard -o
+```
+
+miutima tries Wayland first and then X11 clipboard tools.
+
+## WSL / Ubuntu on Windows
+
+WSL is Linux, so the Linux installation above applies. However, WSL has a special clipboard path because the clipboard belongs to Windows.
+
+### WSL clipboard — recommended setup
+
+First check that Windows PowerShell can be called from WSL:
+
+```bash
+command -v powershell.exe
+```
+
+Then test:
+
+```bash
+powershell.exe -NoProfile -NonInteractive -Command 'Get-Clipboard -Raw'
+```
+
+Copy a YouTube URL in Windows with `Ctrl+C`. The command above should print it inside WSL.
+
+v1.1.0 automatically tries `powershell.exe` / `pwsh.exe` when it detects WSL, before falling back to Linux clipboard tools.
+
+If `powershell.exe` is not found, check:
+
+```bash
+ls -l /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe
+```
+
+If Windows interop has been disabled in WSL, re-enable normal WSL Windows interop and restart the WSL distribution.
+
+## Android Termux — complete installation
+
+Install the Termux packages:
+
+```bash
+pkg update
+pkg upgrade -y
+pkg install python git ffmpeg termux-api -y
+```
+
+Then clone:
+
+```bash
+git clone -b v1.1.0 https://github.com/rezaeemajd/miutima.git
+cd miutima
+```
+
+Create a virtual environment (recommended):
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+Install:
+
+```bash
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+Run:
+
+```bash
+python miutima.py
+```
+
+### Termux clipboard
+
+Termux clipboard access needs both:
+
+1. The Termux package:
 
 ```bash
 pkg install termux-api -y
 ```
 
-Then copy a YouTube URL in Android and choose **2 - Clipboard** in miutima.
+2. The companion **Termux:API Android application** installed on the phone and compatible with the Termux installation.
 
-See [`docs/platforms.md`](docs/platforms.md) for complete platform instructions.
+Test the clipboard directly:
 
-## 🚀 Installation
-
-### Windows CMD
-
-```bat
-git clone https://github.com/rezaeemajd/miutima.git
-cd miutima
-python -m pip install -r requirements.txt
-python miutima.py
+```bash
+termux-clipboard-get
 ```
 
-A CMD launcher is also available:
+Copy a YouTube URL in Android first. The command must print the copied text. Then choose **2 - Clipboard** in miutima.
+
+If `termux-clipboard-get` is missing:
+
+```bash
+pkg install termux-api -y
+```
+
+If it exists but returns nothing, check the Termux:API companion app installation and Android permissions.
+
+## Clipboard summary
+
+| Environment | Method | Extra requirement |
+|---|---|---|
+| Windows CMD | PowerShell `Get-Clipboard` | PowerShell |
+| WSL | `powershell.exe Get-Clipboard` | Windows interop |
+| Linux Wayland | `wl-paste` | `wl-clipboard` |
+| Linux X11 | `xclip` / `xsel` | one of these packages |
+| Termux | `termux-clipboard-get` | Termux:API package + Android app |
+
+No Python clipboard library is required.
+
+## Main menu
 
 ```text
-windows/run_miutima.bat
+1 - Download URL
+2 - Clipboard
+3 - Search YouTube
+4 - Download History
+5 - Settings
+6 - Exit
 ```
 
-### Linux
+## Search YouTube
 
-```bash
-git clone https://github.com/rezaeemajd/miutima.git
-cd miutima
-python3 -m pip install -r requirements.txt
-python3 miutima.py
-```
+Choose **3 - Search YouTube**, enter a search phrase, select a result, and miutima continues with the normal inspector/download flow.
 
-Launcher:
+### Search troubleshooting
 
-```bash
-bash linux/run_miutima.sh
-```
-
-### Android Termux
-
-```bash
-pkg update
-pkg install python git ffmpeg termux-api -y
-git clone https://github.com/rezaeemajd/miutima.git
-cd miutima
-python -m pip install -r requirements.txt
-python miutima.py
-```
-
-Launcher:
-
-```bash
-bash termux/run_miutima.sh
-```
-
-## ▶️ Main menu
+If you see:
 
 ```text
-1 - 🔗 Download URL
-2 - 📋 Clipboard
-3 - 🔎 Search YouTube
-4 - 📚 Download History
-5 - ⚙️ Settings
-6 - ❌ Exit
+Unable to download API page
+Failed to establish a new connection
+[Errno 111] Connection refused
 ```
 
-## 🎬 Video
+this is a **network/proxy connection problem**, not a search-table problem.
 
-Select a quality limit and miutima chooses the best available video/audio combination up to that resolution, then uses FFmpeg to merge streams into MP4 when necessary.
+v1.1.0 now makes two extraction attempts for search/inspection:
 
-## 🎵 Audio
+1. normal yt-dlp network/environment settings;
+2. a direct connection with proxy use disabled.
 
-Select 128, 192, 256 or 320 kbps. FFmpeg converts the selected audio stream to MP3.
+If both fail, test WSL/Ubuntu networking:
 
-## 🔍 Inspector
+```bash
+curl -I https://www.youtube.com
+```
 
-Before downloading, miutima can display title, channel, duration, view count and upload date so you can verify the selected media.
+Check proxy variables:
 
-## 🔎 Search
+```bash
+env | grep -i proxy
+```
 
-Use **Search YouTube** to search directly from the terminal. Select a result and continue through the normal download flow.
+If you see an old or unreachable proxy such as `127.0.0.1:<port>`, fix or unset it before testing again:
 
-## 📚 History
+```bash
+unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy
+```
 
-The last 100 downloads are stored locally. The history menu shows recent items and can start a download again without manually copying the URL.
+Then test:
 
-## ⚙️ Settings
+```bash
+curl -I https://www.youtube.com
+```
 
-Settings are stored outside the repository:
+If your network genuinely requires a proxy, do not unset it permanently; configure the correct working proxy instead.
+
+## Download workflow
+
+### MP4
+
+1. Enter a YouTube URL or select a search result.
+2. Review the Inspector information.
+3. Choose MP4.
+4. Select quality.
+5. Review the estimated size.
+6. Confirm the download.
+7. The video and audio streams are merged with FFmpeg when required.
+
+### MP3
+
+1. Enter a YouTube URL or select a search result.
+2. Choose MP3.
+3. Select bitrate: 128/192/256/320 kbps.
+4. Confirm the download.
+5. FFmpeg extracts the audio to MP3.
+
+## Settings
+
+Settings are stored locally outside the repository:
 
 ```text
 ~/.config/miutima/config.json
 ```
 
-History is stored at:
+History:
 
 ```text
 ~/.config/miutima/history.json
 ```
 
-Available settings include default video quality, audio bitrate, metadata, thumbnail and subtitle options.
+Settings include:
 
-## 📁 Output
+- default video quality
+- default MP3 bitrate
+- metadata embedding
+- thumbnail embedding
+- subtitle enable/disable
+- subtitle language
+
+## Output
 
 ```text
 miutima/
-├── mp4ytd/     # MP4 downloads
-└── mp3ytd/     # MP3 downloads
+├── miutima.py
+├── requirements.txt
+├── README.md
+├── LICENSE
+├── docs/
+├── windows/
+├── linux/
+├── termux/
+├── mp4ytd/     # downloaded MP4 files
+└── mp3ytd/     # downloaded MP3 files
 ```
 
-Generated media and partial download files are excluded by `.gitignore`.
+Downloaded media and temporary files are excluded by `.gitignore`.
 
-## 🔁 Reliability
+## Launchers
 
-miutima enables socket, network, fragment and file-access retries plus continued downloads. If a connection is interrupted, running the same download again can allow yt-dlp to resume a partial file where supported.
+Windows CMD:
 
-## 🛠️ Requirements
-
-- Python 3.10+
-- Git
-- FFmpeg
-- Internet access
-- `yt-dlp`
-- `rich`
-- `imageio-ffmpeg`
-
-Install Python dependencies with:
-
-```bash
-python -m pip install -r requirements.txt
+```cmd
+windows\run_miutima.bat
 ```
 
-On Linux where `python` is not Python 3, use `python3`.
-
-## 🔄 Update
+Linux:
 
 ```bash
-git pull
-python -m pip install -r requirements.txt --upgrade
+bash linux/run_miutima.sh
 ```
 
-## 🧪 Verify
+Termux:
 
 ```bash
+bash termux/run_miutima.sh
+```
+
+## Verify installation
+
+Windows:
+
+```cmd
 python --version
-yt-dlp --version
-ffmpeg -version
+python -m pip show yt-dlp rich imageio-ffmpeg
 python -m py_compile miutima.py
 ```
 
-## 📦 Versions
+Linux/WSL/Termux:
 
-Stable version snapshots are preserved as branches:
+```bash
+python --version
+python -m pip show yt-dlp rich imageio-ffmpeg
+python -m py_compile miutima.py
+ffmpeg -version
+```
 
-- `v1.0.0` — original stable downloader
-- `v1.1.0` — Smart Downloader
-- `main` — latest development state
+## Updating v1.1.0
 
-See [`CHANGELOG.md`](CHANGELOG.md) for the complete version history.
+If you cloned the `v1.1.0` branch:
 
-## ⚖️ Responsible use
+```bash
+git checkout v1.1.0
+git pull origin v1.1.0
+python -m pip install --upgrade -r requirements.txt
+```
 
-miutima is a local interface built on top of yt-dlp. Users are responsible for complying with applicable laws, copyright, service terms and the rights of content owners. Download only media you are legally permitted to download.
+## Version snapshots
 
-## 🔐 Privacy
+- `v1.0.0` — original stable downloader, preserved with its own documentation.
+- `v1.1.0` — Smart Downloader with search, clipboard, history and settings.
+- `main` — latest development state.
 
-miutima does not require a miutima account and does not include project-owned analytics or tracking. Network requests required for extraction and downloading are made by the underlying downloader components.
+Older versions remain available as Git branches so they can be checked out independently.
 
-## 📄 License
+## Responsible use
 
-MIT License. See [`LICENSE`](LICENSE).
-
-## 👨‍💻 Developer
-
-**Amir Majd**  
-Website: **cofinets.com**
+Download only media you are legally permitted to download. Respect copyright, creator rights and applicable service terms.
