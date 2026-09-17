@@ -87,36 +87,80 @@ def inspect(url):
 
 
 def safe_title(title: str) -> str:
-    """Make a portable Android filename without touching the original YouTube title in the UI/history."""
     title = unicodedata.normalize("NFC", str(title or "Download"))
     title = re.sub(r"[\\/:*?\"<>|\x00-\x1f]", "_", title)
     title = re.sub(r"\s+", " ", title).strip(" .")
     return (title or "Download")[:150]
 
 
-def copy_to_shared(source: Path, title: str) -> tuple[Path, str]:
-    """Never let yt-dlp create .part files on Android shared storage.
-    Download into Termux-private storage first, then copy the finished file once."""
+def transfer_to_shared(source: Path, title: str) -> tuple[Path, str]:
+    """Copy only the completed file to Android shared storage.
+    Do not use shutil.copy2/copyfile metadata operations because Android's FUSE layer
+    can reject chmod/utime even when ordinary file writes are allowed.
+    """
     shared_ok = writable_dir(SHARED_DOWNLOADS)
     if not shared_ok:
         return source, "private"
 
     ext = source.suffix or ".bin"
-    destination = SHARED_DOWNLOADS / f"{safe_title(title)}{ext}"
+    base = safe_title(title)
+    destination = SHARED_DOWNLOADS / f"{base}{ext}"
     if destination.exists():
-        destination = SHARED_DOWNLOADS / f"{safe_title(title)} [{int(time.time())}]{ext}"
+        destination = SHARED_DOWNLOADS / f"{base} [{int(time.time())}]{ext}"
+
+    staging = destination.with_name(destination.name + ".miutima-copying")
     try:
-        shutil.copy2(source, destination)
+        total = source.stat().st_size
+        copied = 0
+        with source.open("rb") as src, staging.open("wb") as dst:
+            while True:
+                chunk = src.read(1024 * 1024)
+                if not chunk:
+                    break
+                dst.write(chunk)
+                copied += len(chunk)
+            dst.flush()
+            os.fsync(dst.fileno())
+        if copied != total or staging.stat().st_size != total:
+            raise IOError(f"انتقال فایل ناقص بود ({copied} از {total} بایت).")
+        try:
+            staging.replace(destination)
+        except OSError:
+            # FUSE implementations may reject rename; direct final write is the fallback.
+            with staging.open("rb") as src, destination.open("wb") as dst:
+                while True:
+                    chunk = src.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    dst.write(chunk)
+                dst.flush()
+                os.fsync(dst.fileno())
+            staging.unlink(missing_ok=True)
+        if destination.stat().st_size != total:
+            raise IOError("اندازه فایل نهایی با فایل دانلودشده یکسان نیست.")
         return destination, "shared"
-    except (OSError, PermissionError):
-        return source, "private"
+    except Exception as e:
+        try: staging.unlink(missing_ok=True)
+        except OSError: pass
+        raise RuntimeError(f"انتقال به Downloads اندروید ناموفق بود: {e}") from e
+
+
+def resolve_final_file(work_dir: Path, prepared: Path, media: str) -> Path:
+    preferred = work_dir / (prepared.stem + (".mp3" if media == "mp3" else ".mp4"))
+    if preferred.exists() and not preferred.name.endswith(".part"):
+        return preferred
+    candidates = sorted(
+        [p for p in work_dir.glob(f"{prepared.stem}.*") if not p.name.endswith(".part") and not p.name.endswith(".miutima-copying")],
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    if candidates:
+        return candidates[0]
+    raise FileNotFoundError("فایل نهایی دانلود پس از پایان عملیات پیدا نشد.")
 
 
 def do_download(url, media, quality, bitrate):
     PRIVATE_DOWNLOADS.mkdir(parents=True, exist_ok=True)
-    # Critical Android fix: yt-dlp writes .part/temp files only inside Termux-private storage.
-    # The completed media is copied to shared Downloads afterwards. This avoids Android/FUSE
-    # rejecting .part files even when a simple write test succeeds.
     work_dir = PRIVATE_DOWNLOADS
     outtmpl = str(work_dir / "%(title)s [%(id)s].%(ext)s")
     with lock:
@@ -150,25 +194,18 @@ def do_download(url, media, quality, bitrate):
         with yt_dlp.YoutubeDL(opts) as y:
             info = y.extract_info(url, download=True)
             requested_title = info.get("title", "Download")
-            final_path = Path(y.prepare_filename(info))
+            prepared = Path(y.prepare_filename(info))
 
-        # For merged video / postprocessed audio, the actual final extension differs from
-        # prepare_filename(). Resolve the newest matching completed media file.
-        candidates = sorted(
-            [p for p in work_dir.glob(f"{final_path.stem}.*") if not p.name.endswith(".part")],
-            key=lambda p: p.stat().st_mtime,
-            reverse=True,
-        )
-        source = candidates[0] if candidates else final_path
-        if not source.exists():
-            raise FileNotFoundError("فایل نهایی دانلود پس از پایان عملیات پیدا نشد.")
-
-        destination, storage_mode = copy_to_shared(source, requested_title)
+        with lock:
+            state.update(percent=100, phase="processing", path=str(work_dir))
+        source = resolve_final_file(work_dir, prepared, media)
+        destination, storage_mode = transfer_to_shared(source, requested_title)
         add_history({"title": requested_title, "url": url, "type": media.upper(), "date": time.strftime("%Y-%m-%d %H:%M:%S"), "path": str(destination.parent), "storage": storage_mode})
         with lock:
-            state.update(running=False, phase="done", percent=100, title=requested_title, path=str(destination))
+            state.update(running=False, phase="done", percent=100, title=requested_title, path=str(destination), error="")
     except Exception as e:
-        with lock: state.update(running=False, phase="error", error=str(e)[-1600:], path=str(work_dir))
+        with lock:
+            state.update(running=False, phase="error", error=str(e)[-1600:], path=str(work_dir))
 
 
 class Handler(BaseHTTPRequestHandler):
