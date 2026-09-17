@@ -1,11 +1,13 @@
 {
-  "name": "miutima v2",
-  "short_name": "miutima",
+  "name": "miutima v2.1.0 — Media Player",
+  "short_name": "miutima 2.1",
   "lang": "fa",
   "dir": "rtl",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#0b1120",
-  "theme_color": "#101827",
-  "description": "دانلودر رسانه برای Termux"
+  "background_color": "#070d18",
+  "theme_color": "#070d18",
+  "description": "دانلودر رسانه فارسی برای Termux با پخش‌کننده داخلی MP4 و MP3",
+  "categories": ["multimedia", "utilities"]
 }
