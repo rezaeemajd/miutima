@@ -1,0 +1,11 @@
+{
+  "name": "miutima v2",
+  "short_name": "miutima",
+  "lang": "fa",
+  "dir": "rtl",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b1120",
+  "theme_color": "#101827",
+  "description": "دانلودر رسانه برای Termux"
+}
