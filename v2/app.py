@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import threading
 import time
+import unicodedata
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
@@ -47,13 +48,9 @@ def ensure():
     if not SETTINGS.exists(): SETTINGS.write_text(json.dumps(DEFAULT_SETTINGS, indent=2), encoding="utf-8")
 
 
-def download_dir() -> tuple[Path, str]:
-    # Android/Termux shared storage can occasionally reject temporary .part files.
-    # Test it first; otherwise use Termux-private storage, which is always writable.
-    if writable_dir(SHARED_DOWNLOADS):
-        return SHARED_DOWNLOADS, "shared"
-    PRIVATE_DOWNLOADS.mkdir(parents=True, exist_ok=True)
-    return PRIVATE_DOWNLOADS, "private"
+def storage_info():
+    shared = writable_dir(SHARED_DOWNLOADS)
+    return shared, SHARED_DOWNLOADS, PRIVATE_DOWNLOADS
 
 
 def read_json(path, default):
@@ -89,11 +86,41 @@ def inspect(url):
     return {"title": i.get("title", ""), "channel": i.get("channel") or i.get("uploader") or "", "duration": i.get("duration") or 0, "thumbnail": i.get("thumbnail") or "", "url": url}
 
 
+def safe_title(title: str) -> str:
+    """Make a portable Android filename without touching the original YouTube title in the UI/history."""
+    title = unicodedata.normalize("NFC", str(title or "Download"))
+    title = re.sub(r"[\\/:*?\"<>|\x00-\x1f]", "_", title)
+    title = re.sub(r"\s+", " ", title).strip(" .")
+    return (title or "Download")[:150]
+
+
+def copy_to_shared(source: Path, title: str) -> tuple[Path, str]:
+    """Never let yt-dlp create .part files on Android shared storage.
+    Download into Termux-private storage first, then copy the finished file once."""
+    shared_ok = writable_dir(SHARED_DOWNLOADS)
+    if not shared_ok:
+        return source, "private"
+
+    ext = source.suffix or ".bin"
+    destination = SHARED_DOWNLOADS / f"{safe_title(title)}{ext}"
+    if destination.exists():
+        destination = SHARED_DOWNLOADS / f"{safe_title(title)} [{int(time.time())}]{ext}"
+    try:
+        shutil.copy2(source, destination)
+        return destination, "shared"
+    except (OSError, PermissionError):
+        return source, "private"
+
+
 def do_download(url, media, quality, bitrate):
-    target, storage_mode = download_dir()
+    PRIVATE_DOWNLOADS.mkdir(parents=True, exist_ok=True)
+    # Critical Android fix: yt-dlp writes .part/temp files only inside Termux-private storage.
+    # The completed media is copied to shared Downloads afterwards. This avoids Android/FUSE
+    # rejecting .part files even when a simple write test succeeds.
+    work_dir = PRIVATE_DOWNLOADS
+    outtmpl = str(work_dir / "%(title)s [%(id)s].%(ext)s")
     with lock:
-        state.update(running=True, phase="starting", percent=0, speed="", eta="", title="", error="", started=time.time(), path=str(target))
-    outtmpl = str(target / "%(title)s.%(ext)s")
+        state.update(running=True, phase="starting", percent=0, speed="", eta="", title="", error="", started=time.time(), path=str(work_dir))
 
     def hook(d):
         with lock:
@@ -118,14 +145,30 @@ def do_download(url, media, quality, bitrate):
         opts.update(format="bestaudio/best", postprocessors=[{"key":"FFmpegExtractAudio", "preferredcodec":"mp3", "preferredquality":str(bitrate)}])
     else:
         opts.update(format=f"bestvideo[height<={int(quality)}]+bestaudio/best[height<={int(quality)}]", merge_output_format="mp4")
+
     try:
         with yt_dlp.YoutubeDL(opts) as y:
             info = y.extract_info(url, download=True)
-        title = info.get("title", "Download")
-        add_history({"title": title, "url": url, "type": media.upper(), "date": time.strftime("%Y-%m-%d %H:%M:%S"), "path": str(target), "storage": storage_mode})
-        with lock: state.update(running=False, phase="done", percent=100, title=title, path=str(target))
+            requested_title = info.get("title", "Download")
+            final_path = Path(y.prepare_filename(info))
+
+        # For merged video / postprocessed audio, the actual final extension differs from
+        # prepare_filename(). Resolve the newest matching completed media file.
+        candidates = sorted(
+            [p for p in work_dir.glob(f"{final_path.stem}.*") if not p.name.endswith(".part")],
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        source = candidates[0] if candidates else final_path
+        if not source.exists():
+            raise FileNotFoundError("فایل نهایی دانلود پس از پایان عملیات پیدا نشد.")
+
+        destination, storage_mode = copy_to_shared(source, requested_title)
+        add_history({"title": requested_title, "url": url, "type": media.upper(), "date": time.strftime("%Y-%m-%d %H:%M:%S"), "path": str(destination.parent), "storage": storage_mode})
+        with lock:
+            state.update(running=False, phase="done", percent=100, title=requested_title, path=str(destination))
     except Exception as e:
-        with lock: state.update(running=False, phase="error", error=str(e)[-1600:], path=str(target))
+        with lock: state.update(running=False, phase="error", error=str(e)[-1600:], path=str(work_dir))
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -151,8 +194,9 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/api/settings": self.json(200, read_json(SETTINGS, DEFAULT_SETTINGS)); return
         if p == "/api/clipboard": self.json(200, clipboard()); return
         if p == "/api/storage":
-            shared = writable_dir(SHARED_DOWNLOADS)
-            self.json(200, {"shared_writable": shared, "shared_path": str(SHARED_DOWNLOADS), "private_path": str(PRIVATE_DOWNLOADS), "active_path": str(download_dir()[0])}); return
+            shared, shared_path, private_path = storage_info()
+            active = shared_path if shared else private_path
+            self.json(200, {"shared_writable": shared, "shared_path": str(shared_path), "private_path": str(private_path), "active_path": str(active), "download_strategy": "private-then-copy"}); return
         self.send(404, "Not found", "text/plain; charset=utf-8")
 
     def do_POST(self):
