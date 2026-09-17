@@ -76,6 +76,7 @@ cat > "$SHORTCUTS/miutima-v2-status.sh" <<'EOF'
 set -u
 APP="$HOME/.miutima-v2"
 PID="$APP/miutima.pid"
+URL="http://127.0.0.1:8765"
 if [ ! -f "$PID" ]; then
   echo "miutima v2: متوقف است (PID file وجود ندارد)."
   exit 0
