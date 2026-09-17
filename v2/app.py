@@ -18,22 +18,42 @@ HOST = "127.0.0.1"
 PORT = int(os.environ.get("MIUTIMA_PORT", "8765"))
 ROOT = Path(__file__).resolve().parent
 DATA = Path.home() / ".miutima-v2"
-DOWNLOADS = Path.home() / "storage" / "downloads" / "miutima-v2"
+PRIVATE_DOWNLOADS = DATA / "downloads"
+SHARED_DOWNLOADS = Path.home() / "storage" / "downloads" / "miutima-v2"
 HISTORY = DATA / "history.json"
 SETTINGS = DATA / "settings.json"
 INDEX = ROOT / "web" / "index.html"
 MAX_HISTORY = 100
-
 DEFAULT_SETTINGS = {"video_quality": 720, "audio_bitrate": 192}
-state = {"running": False, "phase": "idle", "percent": 0, "speed": "", "eta": "", "title": "", "error": "", "started": None}
+state = {"running": False, "phase": "idle", "percent": 0, "speed": "", "eta": "", "title": "", "error": "", "started": None, "path": ""}
 lock = threading.Lock()
+
+
+def writable_dir(path: Path) -> bool:
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        probe = path / ".miutima-write-test"
+        probe.write_bytes(b"ok")
+        probe.unlink(missing_ok=True)
+        return True
+    except (OSError, PermissionError):
+        return False
 
 
 def ensure():
     DATA.mkdir(parents=True, exist_ok=True)
-    DOWNLOADS.mkdir(parents=True, exist_ok=True)
+    PRIVATE_DOWNLOADS.mkdir(parents=True, exist_ok=True)
     if not HISTORY.exists(): HISTORY.write_text("[]", encoding="utf-8")
     if not SETTINGS.exists(): SETTINGS.write_text(json.dumps(DEFAULT_SETTINGS, indent=2), encoding="utf-8")
+
+
+def download_dir() -> tuple[Path, str]:
+    # Android/Termux shared storage can occasionally reject temporary .part files.
+    # Test it first; otherwise use Termux-private storage, which is always writable.
+    if writable_dir(SHARED_DOWNLOADS):
+        return SHARED_DOWNLOADS, "shared"
+    PRIVATE_DOWNLOADS.mkdir(parents=True, exist_ok=True)
+    return PRIVATE_DOWNLOADS, "private"
 
 
 def read_json(path, default):
@@ -48,23 +68,19 @@ def valid_url(url):
 def clipboard():
     try:
         p = subprocess.run(["termux-clipboard-get"], capture_output=True, text=True, timeout=5)
-        return p.stdout.strip() if p.returncode == 0 else ""
-    except Exception: return ""
+        if p.returncode == 0:
+            return {"text": p.stdout.strip(), "available": True, "message": ""}
+        return {"text": "", "available": False, "message": "Termux:API در دسترس نیست یا مجوز کلیپ‌بورد وجود ندارد."}
+    except FileNotFoundError:
+        return {"text": "", "available": False, "message": "دستور termux-clipboard-get پیدا نشد. بسته termux-api و اپ Termux:API را نصب کنید."}
+    except Exception as e:
+        return {"text": "", "available": False, "message": str(e)}
 
 
 def add_history(item):
     items = read_json(HISTORY, [])
     items.insert(0, item)
     HISTORY.write_text(json.dumps(items[:MAX_HISTORY], ensure_ascii=False, indent=2), encoding="utf-8")
-
-
-def human_size(n):
-    if not n: return "نامشخص"
-    n = float(n)
-    for u in ("B", "KB", "MB", "GB", "TB"):
-        if n < 1024 or u == "TB": return f"{n:.1f} {u}"
-        n /= 1024
-    return "نامشخص"
 
 
 def inspect(url):
@@ -74,9 +90,10 @@ def inspect(url):
 
 
 def do_download(url, media, quality, bitrate):
+    target, storage_mode = download_dir()
     with lock:
-        state.update(running=True, phase="starting", percent=0, speed="", eta="", title="", error="", started=time.time())
-    outtmpl = str(DOWNLOADS / "%(title)s.%(ext)s")
+        state.update(running=True, phase="starting", percent=0, speed="", eta="", title="", error="", started=time.time(), path=str(target))
+    outtmpl = str(target / "%(title)s.%(ext)s")
 
     def hook(d):
         with lock:
@@ -95,6 +112,7 @@ def do_download(url, media, quality, bitrate):
         "fragment_retries": 10, "continuedl": True, "overwrites": False,
         "concurrent_fragment_downloads": 1, "outtmpl": outtmpl,
         "progress_hooks": [hook], "windowsfilenames": False,
+        "restrictfilenames": False,
     }
     if media == "mp3":
         opts.update(format="bestaudio/best", postprocessors=[{"key":"FFmpegExtractAudio", "preferredcodec":"mp3", "preferredquality":str(bitrate)}])
@@ -104,10 +122,10 @@ def do_download(url, media, quality, bitrate):
         with yt_dlp.YoutubeDL(opts) as y:
             info = y.extract_info(url, download=True)
         title = info.get("title", "Download")
-        add_history({"title": title, "url": url, "type": media.upper(), "date": time.strftime("%Y-%m-%d %H:%M:%S"), "path": str(DOWNLOADS)})
-        with lock: state.update(running=False, phase="done", percent=100, title=title)
+        add_history({"title": title, "url": url, "type": media.upper(), "date": time.strftime("%Y-%m-%d %H:%M:%S"), "path": str(target), "storage": storage_mode})
+        with lock: state.update(running=False, phase="done", percent=100, title=title, path=str(target))
     except Exception as e:
-        with lock: state.update(running=False, phase="error", error=str(e)[-1200:])
+        with lock: state.update(running=False, phase="error", error=str(e)[-1600:], path=str(target))
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -124,17 +142,17 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         p = urlparse(self.path).path
-        if p == "/":
-            self.send(200, INDEX.read_bytes(), "text/html; charset=utf-8"); return
-        if p == "/manifest.webmanifest":
-            self.send(200, (ROOT/"web"/"manifest.webmanifest").read_bytes(), "application/manifest+json"); return
-        if p == "/sw.js":
-            self.send(200, (ROOT/"web"/"sw.js").read_bytes(), "application/javascript; charset=utf-8"); return
+        if p == "/": self.send(200, INDEX.read_bytes(), "text/html; charset=utf-8"); return
+        if p == "/manifest.webmanifest": self.send(200, (ROOT/"web"/"manifest.webmanifest").read_bytes(), "application/manifest+json"); return
+        if p == "/sw.js": self.send(200, (ROOT/"web"/"sw.js").read_bytes(), "application/javascript; charset=utf-8"); return
         if p == "/api/status":
             with lock: self.json(200, dict(state)); return
         if p == "/api/history": self.json(200, read_json(HISTORY, [])); return
         if p == "/api/settings": self.json(200, read_json(SETTINGS, DEFAULT_SETTINGS)); return
-        if p == "/api/clipboard": self.json(200, {"text": clipboard()}); return
+        if p == "/api/clipboard": self.json(200, clipboard()); return
+        if p == "/api/storage":
+            shared = writable_dir(SHARED_DOWNLOADS)
+            self.json(200, {"shared_writable": shared, "shared_path": str(SHARED_DOWNLOADS), "private_path": str(PRIVATE_DOWNLOADS), "active_path": str(download_dir()[0])}); return
         self.send(404, "Not found", "text/plain; charset=utf-8")
 
     def do_POST(self):
@@ -149,6 +167,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         if p == "/api/download":
             url = str(data.get("url", "")).strip(); media = str(data.get("media", "mp4"))
+            if media not in {"mp4", "mp3"}: self.json(400, {"error":"نوع خروجی نامعتبر است"}); return
             if not valid_url(url): self.json(400, {"error":"لینک یوتیوب معتبر نیست"}); return
             with lock:
                 if state["running"]: self.json(409, {"error":"یک دانلود در حال اجراست"}); return
