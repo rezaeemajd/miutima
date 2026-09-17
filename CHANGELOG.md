@@ -2,9 +2,18 @@
 
 All notable changes to miutima are documented here.
 
-## v1.1.0 — Smart Downloader
+## v2.0.0 — Termux PWA Edition
 
-### Features
+- New mobile-first Persian RTL PWA interface
+- Local-only HTTP service on `127.0.0.1:8765`
+- URL inspection, MP4/MP3 download controls
+- Download progress, status and local history
+- Termux clipboard integration
+- Non-destructive isolated installer under `~/.miutima-v2`
+- Termux:Widget launch/stop/open scripts
+- v1.0.0 and v1.1.0 code paths and branches remain preserved
+
+## v1.1.0 — Smart Downloader
 
 - Cross-platform clipboard support for Windows, WSL, Linux and Termux
 - Video Inspector before download
@@ -16,18 +25,10 @@ All notable changes to miutima are documented here.
 - Retry, fragment retry and resume support
 - Complete Windows, Linux, WSL and Termux documentation
 
-### Stability fixes
-
-- Search retries once with proxy usage disabled when the normal yt-dlp connection fails.
-- WSL clipboard explicitly tries Windows PowerShell (`powershell.exe` / `pwsh.exe`).
-- Clipboard diagnostics now explain platform-specific setup.
-- Subtitle settings no longer request a language when subtitles are being disabled.
-- Documentation includes WSL network, DNS and proxy diagnostics.
-
 ## v1.0.0 — Stable Foundation
 
 - MP4 video downloads
-- MP3 audio downloads at 192 kbps
+- MP3 audio downloads
 - Playlist support
 - Rich terminal interface
 - Video quality selection
@@ -37,4 +38,4 @@ All notable changes to miutima are documented here.
 
 ## Version policy
 
-The `v1.0.0` and `v1.1.0` branches preserve version snapshots. The `main` branch contains the latest development state.
+Version branches are preserved snapshots. `v2.0.0` is a new branch built from `main`; the existing `v1.0.0` and `v1.1.0` branches are not deleted or overwritten.
