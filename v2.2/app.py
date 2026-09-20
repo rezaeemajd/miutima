@@ -91,7 +91,7 @@ def transfer(source,title):
     if dest.exists(): dest=FINAL_DIR/f"{base} [{int(time.time())}]{ext}"
     tmp=dest.with_name(dest.name+".miutima-copying")
     total=source.stat().st_size; copied=0
-    with source.open("rb") as src,tmpf if False else open(tmp,"wb") as dst:
+    with source.open("rb") as src, tmp.open("wb") as dst:
         while True:
             chunk=src.read(1024*1024)
             if not chunk: break
