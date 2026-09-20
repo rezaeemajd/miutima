@@ -13,6 +13,9 @@ A new isolated edition of **miutima** for **Windows, Linux, WSL and Android Term
 - Animated success card with check, glow and confetti
 - File name, type and size after completion
 - HTTP byte-range support for seeking
+- Persistent media library for all completed files in the v2.2 Downloads folder
+- Click-to-play entries directly from download history
+- Reopen and replay the same downloaded file without downloading it again
 - Browser Clipboard API plus OS-specific clipboard fallback
 - Local-only server bound to `127.0.0.1:8766`
 - Separate runtime data under `~/.miutima-v2.2`
@@ -145,6 +148,9 @@ termux-setup-storage
 10. When the final file is verified, the completion effect appears.
 11. Press **نمایش و پخش فایل**.
 12. Video opens in the video player, audio in the audio player, and supported images in the image preview.
+13. Use **فایل‌های دانلودشده** in the media center to replay any completed file still present in Downloads.
+14. Open **نمایش تاریخچه و پخش** and select any history item whose file still exists; unavailable files are clearly disabled.
+15. Closing the player no longer destroys its media source, so the same file can be replayed or resumed.
 
 ## Media delivery
 
@@ -164,13 +170,15 @@ verified completed file
 platform Downloads/miutima-v2.2/
    |
    v
-/media/current
+/media/current (latest download)
+   |
+   +-- /media/file?name=... (persistent downloaded-file playback)
    |
    v
 HTML5 video / audio / image preview
 ```
 
-The `/media/current` endpoint is restricted to the application's controlled download roots and supports HTTP Range requests for media seeking.
+The `/media/current` endpoint is restricted to the application's controlled download roots and supports HTTP Range requests for media seeking. Completed files are also exposed through the restricted `/media/file?name=...` endpoint, which accepts only a filename inside the platform Downloads folder. The UI reads `/api/files` for the persistent media library and `/api/history` for history entries with an availability check.
 
 ## Runtime data
 
