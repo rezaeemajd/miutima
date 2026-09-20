@@ -1,5 +1,27 @@
 # Changelog
 
+## v2.2.0 — Cross-Platform Media Player
+
+### Added
+- Unified Windows / Linux / WSL / Termux web application
+- Built-in video, audio and image preview
+- Local HTTP Range media delivery
+- Processing / transfer animation
+- Completion success effect
+- Platform-aware Downloads directory
+- OS-specific clipboard fallback
+- Windows PowerShell installer
+- Linux installer
+- Termux installer
+- Separate port 8766 and runtime directory
+
+### Preserved
+- v2.1.0-media-player remains unchanged
+- v2.0.0 remains unchanged
+- v1.x branches remain unchanged
+
+# Changelog
+
 All notable changes to miutima are documented here.
 
 ## v2.1.0 — Media Player Edition
