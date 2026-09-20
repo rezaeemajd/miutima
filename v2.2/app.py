@@ -188,7 +188,7 @@ class Handler(BaseHTTPRequestHandler):
         if p=="/api/history": self.json(200,read_json(HISTORY,[])); return
         if p=="/api/settings": self.json(200,read_json(SETTINGS,DEFAULT_SETTINGS)); return
         if p=="/api/clipboard": self.json(200,clipboard()); return
-        if p=="/api/storage": self.json(200,{"platform":"Termux" if is_termux() else ("Windows" if os.name=="nt" else "Linux"),"work_path":str(WORK),"download_path":str(FINAL_DIR),"download_strategy":"private-then-copy","port":PORT}); return
+        if p=="/api/storage": self.json(200,{"platform":"Termux" if is_termux() else ("Windows" if os.name=="nt" else "Linux"),"work_path":str(WORK),"download_path":str(FINAL_DIR),"active_path":str(FINAL_DIR),"download_strategy":"private-then-copy","port":PORT}); return
         self.send(404,"Not found","text/plain; charset=utf-8")
     def do_POST(self):
         p=urlparse(self.path).path
