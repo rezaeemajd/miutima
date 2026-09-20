@@ -1,1 +1,1 @@
-yt-dlp>=2026.8.19\n
+yt-dlp>=2026.8.19\nimageio-ffmpeg>=0.6.0\n
