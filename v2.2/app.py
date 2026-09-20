@@ -219,7 +219,10 @@ class Handler(BaseHTTPRequestHandler):
             while left:
                 chunk=f.read(min(1024*1024,left))
                 if not chunk: break
-                self.wfile.write(chunk); left-=len(chunk)
+                try:
+                    self.wfile.write(chunk); left-=len(chunk)
+                except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
+                    return
 
     def media(self):
         p=current_media()
