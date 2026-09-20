@@ -5,7 +5,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import quote, urlparse
 
-import yt_dlp
+import yt_dlp\ntry:\n    import imageio_ffmpeg\nexcept ImportError:\n    imageio_ffmpeg=None
 
 HOST="127.0.0.1"
 PORT=int(os.environ.get("MIUTIMA_PORT","8766"))
@@ -123,7 +123,7 @@ def do_download(url,media,quality,bitrate):
             elif d.get("status")=="finished": state.update(percent=100,phase="processing")
     out=str(WORK/"%(title)s [%(id)s].%(ext)s")
     opts={"quiet":True,"no_warnings":True,"noplaylist":True,"retries":10,"fragment_retries":10,"file_access_retries":10,"continuedl":True,"overwrites":False,"concurrent_fragment_downloads":1,"outtmpl":out,"progress_hooks":[hook],"windowsfilenames":os.name=="nt"}
-    if media=="mp3":
+    if imageio_ffmpeg is not None:\n        try: opts["ffmpeg_location"]=shutil.which("ffmpeg") or imageio_ffmpeg.get_ffmpeg_exe()\n        except Exception: pass\n    if media=="mp3":
         opts.update(format="bestaudio/best",postprocessors=[{"key":"FFmpegExtractAudio","preferredcodec":"mp3","preferredquality":str(bitrate)}])
     else:
         opts.update(format=f"bestvideo[height<={int(quality)}]+bestaudio/best[height<={int(quality)}]",merge_output_format="mp4")
