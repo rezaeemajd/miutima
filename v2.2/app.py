@@ -3,7 +3,7 @@ from __future__ import annotations
 import json, mimetypes, os, re, shutil, subprocess, sys, threading, time, unicodedata
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import quote, urlparse
+from urllib.parse import quote, urlparse, parse_qs
 
 import yt_dlp
 try:
@@ -146,12 +146,51 @@ def do_download(url,media,quality,bitrate):
     except Exception as e:
         with lock: state.update(running=False,phase="error",error=str(e)[-1800:],path=str(WORK),media_url="")
 
+def safe_final_file(name):
+    name=Path(str(name or "")).name
+    if not name or name in {".",".."}: return None
+    p=(FINAL_DIR/name).resolve()
+    root=FINAL_DIR.resolve()
+    if not (p==root or root in p.parents): return None
+    return p if p.is_file() else None
+
 def current_media():
     with lock: raw=state.get("path","")
     if not raw: return None
     p=Path(raw).resolve(); roots=[WORK.resolve(),FINAL_DIR.resolve()]
     if not any(p==r or r in p.parents for r in roots): return None
     return p if p.is_file() else None
+
+def downloaded_files():
+    FINAL_DIR.mkdir(parents=True,exist_ok=True)
+    rows=[]
+    for p in FINAL_DIR.iterdir():
+        if not p.is_file() or p.name.endswith(".miutima-copying"): continue
+        mime=mimetypes.guess_type(p.name)[0] or "application/octet-stream"
+        try:
+            st=p.stat()
+            rows.append({"name":p.name,"size":st.st_size,"mtime":st.st_mtime,"mime":mime,"url":"/media/file?name="+quote(p.name)})
+        except OSError:
+            pass
+    rows.sort(key=lambda x:x["mtime"],reverse=True)
+    return rows[:100]
+
+def history_items():
+    items=read_json(HISTORY,[])
+    if not isinstance(items,list): return []
+    out=[]
+    for i,item in enumerate(items[:MAX_HISTORY]):
+        x=dict(item)
+        p=safe_final_file(x.get("file",""))
+        x["available"]=bool(p)
+        if p:
+            x["media_url"]="/media/file?name="+quote(p.name)
+            x["file_size"]=p.stat().st_size
+        else:
+            x["media_url"]=""
+        x["history_index"]=i
+        out.append(x)
+    return out
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self,*_): pass
@@ -161,9 +200,7 @@ class Handler(BaseHTTPRequestHandler):
     def json(self,code,obj): self.send(code,json.dumps(obj,ensure_ascii=False),"application/json; charset=utf-8")
     def body(self):
         n=int(self.headers.get("Content-Length","0")); return json.loads(self.rfile.read(n) or b"{}")
-    def media(self):
-        p=current_media()
-        if not p: self.send(404,"Media not available","text/plain; charset=utf-8"); return
+    def serve_media_file(self,p):
         size=p.stat().st_size; mime=mimetypes.guess_type(p.name)[0] or "application/octet-stream"
         rh=self.headers.get("Range",""); start,end=0,size-1
         if rh.startswith("bytes="):
@@ -183,15 +220,27 @@ class Handler(BaseHTTPRequestHandler):
                 chunk=f.read(min(1024*1024,left))
                 if not chunk: break
                 self.wfile.write(chunk); left-=len(chunk)
+
+    def media(self):
+        p=current_media()
+        if not p: self.send(404,"Media not available","text/plain; charset=utf-8"); return
+        self.serve_media_file(p)
     def do_GET(self):
         p=urlparse(self.path).path
         if p=="/": self.send(200,INDEX.read_bytes(),"text/html; charset=utf-8"); return
         if p=="/manifest.webmanifest": self.send(200,(ROOT/"web"/"manifest.webmanifest").read_bytes(),"application/manifest+json"); return
         if p=="/sw.js": self.send(200,(ROOT/"web"/"sw.js").read_bytes(),"application/javascript; charset=utf-8"); return
         if p=="/media/current": self.media(); return
+        if p=="/media/file":
+            q=parse_qs(urlparse(self.path).query)
+            target=safe_final_file(q.get("name",[""])[0])
+            if not target:
+                self.send(404,"Media not available","text/plain; charset=utf-8"); return
+            self.serve_media_file(target); return
         if p=="/api/status":
             with lock: self.json(200,dict(state)); return
-        if p=="/api/history": self.json(200,read_json(HISTORY,[])); return
+        if p=="/api/history": self.json(200,history_items()); return
+        if p=="/api/files": self.json(200,downloaded_files()); return
         if p=="/api/settings": self.json(200,read_json(SETTINGS,DEFAULT_SETTINGS)); return
         if p=="/api/clipboard": self.json(200,clipboard()); return
         if p=="/api/storage": self.json(200,{"platform":"Termux" if is_termux() else ("Windows" if os.name=="nt" else "Linux"),"work_path":str(WORK),"download_path":str(FINAL_DIR),"active_path":str(FINAL_DIR),"download_strategy":"private-then-copy","port":PORT}); return
