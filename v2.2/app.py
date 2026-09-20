@@ -5,7 +5,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import quote, urlparse
 
-import yt_dlp\ntry:\n    import imageio_ffmpeg\nexcept ImportError:\n    imageio_ffmpeg=None
+import yt_dlp
+try:\n    import imageio_ffmpeg\nexcept ImportError:\n    imageio_ffmpeg=None
 
 HOST="127.0.0.1"
 PORT=int(os.environ.get("MIUTIMA_PORT","8766"))
