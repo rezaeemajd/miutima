@@ -1,0 +1,13 @@
+{
+  "name": "miutima v2.2.0 — Media Player",
+  "short_name": "miutima 2.1",
+  "lang": "fa",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#070d18",
+  "theme_color": "#070d18",
+  "description": "دانلودر رسانه فارسی برای ویندوز، لینوکس و ترموکس با پخش‌کننده داخلی MP4 و MP3",
+  "categories": ["multimedia", "utilities"]
+}
